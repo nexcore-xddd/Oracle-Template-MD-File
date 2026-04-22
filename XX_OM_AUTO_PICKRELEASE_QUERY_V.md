@@ -1,166 +1,137 @@
-好的，這就為您產出 `XX_OM_AUTO_PICKRELEASE_QUERY_V` 的標準 MD Template 文件。
-
----
-
-### TEMPLATE_ID: XX_OM_AUTO_PICKRELEASE_QUERY_V
-- **用途**：此 View 用於查詢已準備好進行揀貨釋放 (Pick Release) 的出貨單 (Delivery)。它整合了出貨單頭、客戶、運送方式及明細行狀態等關鍵資訊，主要支援客製化的自動揀貨釋放作業或相關查詢介面。
+### TEMPLATE_ID: OM.XX_OM_AUTO_PICKRELEASE_QUERY_V
+- **用途**：查詢可進行自動揀貨（Auto Pick Release）的出貨單（Delivery）。此視圖整合了待揀貨、已處理及有特殊標記的出貨單資訊，主要用於支援客製化的自動揀貨介面或批次處理程序。
 - **角色**：主表
 - **關鍵 Foreign Keys (輸出介面)**：
-    - **核心業務關聯**：
-        - `wsh_delivery_assignments.delivery_id` -> `wsh_deliveries.delivery_id` (出貨單頭與分配表的關聯)
-        - `wsh_delivery_assignments.delivery_detail_id` -> `wsh_delivery_details.delivery_detail_id` (出貨明細與分配表的關聯)
-        - `wsh_delivery_details.source_header_id` -> `oe_order_headers_all.header_id` (出貨明細關聯回銷售訂單頭)
-    - **維度關聯**：
-        - `wnd.customer_id` -> `ar_customers.customer_id` (客戶主檔)
-        - `wnd.organization_id` -> `mtl_parameters.organization_id` (庫存組織主檔)
-        - `wnd.ultimate_dropoff_location_id` -> `wsh_locations.wsh_location_id` (最終卸貨地點)
-        - `wnd.initial_pickup_location_id` -> `wsh_locations.wsh_location_id` (初始提貨地點)
+    - **核心業務關聯**：`WSH_DELIVERY_ASSIGNMENTS.delivery_id` -> `WSH_NEW_DELIVERIES_V.delivery_id`
+    - **核心業務關聯**：`WSH_DELIVERY_DETAILS.delivery_detail_id` -> `WSH_DELIVERY_ASSIGNMENTS.delivery_detail_id`
+    - **核心業務關聯**：`WSH_NEW_DELIVERIES_V.customer_id` -> `AR_CUSTOMERS.customer_id`
+    - **核心業務關聯**：`WSH_DELIVERY_DETAILS.source_header_id` -> `XX_OM_ORDER_HEADERS_EXT.header_id`
+    - **維度關聯**：`WSH_NEW_DELIVERIES_V.organization_id` -> 庫存組織
+    - **維度關聯**：`WSH_NEW_DELIVERIES_V.ultimate_dropoff_location_id` -> 最終卸貨地點
+    - **維度關聯**：`WSH_NEW_DELIVERIES_V.initial_pickup_location_id` -> 初始提貨地點
 - **關鍵欄位說明 (Field Metadata)**：
-    - **`wnd.name` (DN)**：
-        - **用途**：出貨單編號 (Delivery Name)，為使用者在系統中識別的主要編號。
+    - **`WSH_NEW_DELIVERIES_V.name` ([DN])**：
+        - **用途**：出貨單編號 (Delivery Name)。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`ar.CUSTOMER_NAME` (CONSIGNEE)**：
-        - **用途**：收貨人/客戶名稱，來自客戶主檔。
+    - **`AR_CUSTOMERS.CUSTOMER_NAME` ([CONSIGNEE])**：
+        - **用途**：收貨人/客戶名稱。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`wdd.released_status` ([IMPLICIT_FILTER])**：
-        - **用途**：出貨明細行的釋放狀態，此 View 過濾 `R` (Ready to Release) 或 `B` (Backordered)，代表是可執行揀貨的狀態。
-        - **代碼映射 (Mapping)**：`WSH_RELEASE_STATUS` (Lookup Type)
-        - **強制規則**：此 View 的核心邏輯，僅包含 'R', 'B' 狀態的資料。
-    - **`wnd.planned_flag` (FIRM_STATUS)**：
-        - **用途**：出貨單的計畫標誌，`Y` 代表已確認 (Firm)，是執行揀貨的先決條件之一。View 中將 Y/N 轉為 'Contents Firm'/'Not Firm'。
-        - **代碼映射 (Mapping)**：'Y'/'N' 布林標誌
-        - **強制規則**：此 View 的核心邏輯，僅包含 `planned_flag = 'Y'` 的資料。
-    - **`org.organization_code` (ORG_CODE)**：
-        - **用途**：出貨庫存組織的代碼。
+    - **`WSH_LOCATIONS.ui_location_code` ([ULTIMATE_SHIP_TO])**：
+        - **用途**：最終運達地點的代碼。
+        - **代碼映射 (Mapping)**：`WSH_LOCATIONS`
+        - **強制規則**：不適用
+    - **`MTL_PARAMETERS.organization_code` ([ORG_CODE])**：
+        - **用途**：出貨單所屬的庫存組織代碼。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`wnd.attribute6` (TAX_CODE)**：
-        - **用途**：客製化欄位，用於記錄稅務代碼或相關資訊。
-        - **代碼映射 (Mapping)**：依客製需求定義
-        - **強制規則**：依客製需求定義
+    - **`WSH_NEW_DELIVERIES_V.planned_flag` ([FIRM_STATUS])**：
+        - **用途**：標示出貨單內容是否已確認。`Y` 代表 'Contents Firm' (已確認)，否則為 'Not Firm'。
+        - **代碼映射 (Mapping)**：不適用
+        - **強制規則**：不適用
+    - **`XX_OM_ORDER_HEADERS_EXT.pallet_type` ([PALLET_TYPE])**：
+        - **用途**：從訂單擴充表取得的棧板類型，為客製化欄位，用於出貨排序。
+        - **代碼映射 (Mapping)**：`XX_OM_ORDER_HEADERS_EXT`
+        - **強制規則**：不適用
+    - **`XX_OM_AUTO_PICKRELEASE_TMP.seq_id` ([SEQ_ID])**：
+        - **用途**：從暫存表來的處理序號，用於標示已處理的出貨單。
+        - **代碼映射 (Mapping)**：不適用
+        - **強制規則**：不適用
+    - **`(hardcoded)` ([HAD_BEEN_DO_RECORD])**：
+        - **用途**：硬式編碼的旗標，'Y' 表示該記錄來自暫存處理表 `XX_OM_AUTO_PICKRELEASE_TMP`，'N' 表示來自標準的出貨單。
+        - **代碼映射 (Mapping)**：不適用
+        - **強制規則**：不適用
 
 - **範例 SQL**：
-
-    **層次一：直接使用 View 的查詢範例**
+    層次一：直接使用 View 的查詢範例
     ```sql
     /*
-     * 情境：倉庫管理員希望快速查詢某個庫存組織 (ORG_CODE) 下，
-     * 所有準備好可以進行揀貨釋放的出貨單，並可依客戶名稱進行模糊搜尋。
-     * 這是最直接、快速的使用方式。
-    */
+     * 情境：快速查詢特定庫存組織下，準備好進行自動揀貨的出貨單。
+     * 常用於自動揀貨作業的使用者介面，可依客戶或出貨單號進行篩選。
+     */
     SELECT
-        DN,                  -- 出貨單號
-        CONSIGNEE,           -- 客戶名稱
-        ULTIMATE_SHIP_TO,    -- 最終目的地
-        SHIP_METHOD,         -- 運送方式
-        STATUS,              -- 出貨單狀態
-        FIRM_STATUS,         -- 確認狀態
-        ORG_CODE,            -- 庫存組織
-        CREATION_DATE
+        V.DN,
+        V.CONSIGNEE,
+        V.ULTIMATE_SHIP_TO,
+        V.SHIP_METHOD,
+        V.STATUS,
+        V.FIRM_STATUS,
+        V.ORG_CODE,
+        V.PALLET_TYPE,
+        V.HAD_BEEN_DO_RECORD
     FROM
-        XX_OM_AUTO_PICKRELEASE_QUERY_V
+        XX_OM_AUTO_PICKRELEASE_QUERY_V V
     WHERE
-        ORG_CODE = :p_org_code -- 參數：庫存組織代碼，例如 'G21'
-        AND CONSIGNEE LIKE :p_customer_name || '%' -- 參數：客戶名稱，例如 'ACME%'
+        V.ORG_CODE = :P_ORG_CODE -- 庫存組織
+        AND V.CONSIGNEE LIKE :P_CUSTOMER_NAME || '%' -- 客戶名稱 (可模糊查詢)
     ORDER BY
-        CREATION_DATE DESC;
+        V.SORT_FLAG,       -- 依據 View 內建的排序邏輯
+        V.CONSIGNEE,
+        V.PALLET_TYPE,
+        V.DN DESC;
     ```
 
-    **層次二：拆解 View 背後 Table 的串接範例**
+    層次二：拆解 View 背後 Table 的串接範例
     ```sql
     /*
-     * 情境：除了 View 提供的資訊，還需要查詢原始的銷售訂單號碼 (ORDER_NUMBER)
-     * 以及訂單的類型 (ORDER_TYPE)，但 View 內未包含這些欄位。
-     * 因此，我們直接串接核心的幾張 Table，以取得更完整的資訊。
-    */
+     * 情境：需要查詢準備揀貨的出貨單，並額外取得出貨明細的訂購數量及單位。
+     * 由於 View 未提供訂單數量資訊，因此直接串接核心的 WSH (Shipping) 資料表來取得更詳細的資料。
+     */
     SELECT
-        wd.name                  AS delivery_name,
-        ooha.order_number,
-        oott.name                AS order_type,
-        hp.party_name            AS customer_name,
-        wdd.source_line_number   AS so_line,
-        wdd.requested_quantity,
-        wdd.released_status
+        WND.NAME                AS DELIVERY_NAME,
+        WND.DELIVERY_ID,
+        AC.CUSTOMER_NAME        AS CONSIGNEE,
+        MP.ORGANIZATION_CODE    AS ORG_CODE,
+        WDD.SOURCE_HEADER_ID,
+        WDD.SOURCE_LINE_ID,
+        WDD.REQUESTED_QUANTITY,
+        WDD.REQUESTED_QUANTITY_UOM
     FROM
-        wsh_deliveries             wd,
-        wsh_delivery_assignments   wda,
-        wsh_delivery_details       wdd,
-        oe_order_headers_all       ooha,
-        oe_order_lines_all         oola,
-        oe_transaction_types_tl    oott,
-        hz_cust_accounts           hca,
-        hz_parties                 hp
+        WSH_NEW_DELIVERIES         WND,
+        WSH_DELIVERY_ASSIGNMENTS   WDA,
+        WSH_DELIVERY_DETAILS       WDD,
+        AR_CUSTOMERS               AC,
+        MTL_PARAMETERS             MP
     WHERE
-        wd.delivery_id = wda.delivery_id
-        AND wda.delivery_detail_id = wdd.delivery_detail_id
-        AND wdd.source_header_id = ooha.header_id
-        AND wdd.source_line_id = oola.line_id
-        AND ooha.order_type_id = oott.transaction_type_id
-        AND ooha.sold_to_org_id = hca.cust_account_id
-        AND hca.party_id = hp.party_id
-        AND oott.language = USERENV('LANG')
-        -- 以下為 View 的核心過濾條件
-        AND wd.planned_flag = 'Y'
-        AND wd.status_code <> 'CL'
-        AND wdd.released_status IN ('R', 'B')
-        -- 參數化查詢
-        AND wd.organization_id = (SELECT organization_id FROM mtl_parameters WHERE organization_code = :p_org_code)
-        AND wd.name = :p_delivery_name;
+        WND.DELIVERY_ID = WDA.DELIVERY_ID
+        AND WDA.DELIVERY_DETAIL_ID = WDD.DELIVERY_DETAIL_ID
+        AND WND.CUSTOMER_ID = AC.CUSTOMER_ID
+        AND WND.ORGANIZATION_ID = MP.ORGANIZATION_ID
+        -- 篩選 View 的核心條件：已計劃且狀態為可出貨或已分批
+        AND WND.PLANNED_FLAG = 'Y'
+        AND WDD.RELEASED_STATUS IN ('R', 'B') -- R: Ready to Release, B: Backordered
+        AND WND.STATUS_CODE <> 'CL' -- Not Closed
+        -- 查詢參數
+        AND MP.ORGANIZATION_CODE = :P_ORG_CODE;
     ```
 
-    **層次三：跨業務情境的延伸串接範例**
+    層次三：跨業務情境的延伸串接範例
     ```sql
     /*
-     * 情境：揀貨前的備料分析。在執行揀貨釋放前，物控或倉管人員想預先知道，
-     * 針對所有「準備好釋放」的出貨單，其對應料號在指定的倉庫子庫存 (Subinventory) 中，
-     * 是否有足夠的現有庫存 (On-hand Quantity)。
-     * 這有助於提前發現潛在的缺料風險。
-    */
+     * 情境：針對即將揀貨的出貨單，需回溯追蹤其原始銷售訂單的資訊，例如訂單類型或業務員。
+     * 此查詢結合了 WSH (出貨) 與 OE (訂單管理) 模組，提供從出貨到銷售的完整視圖，便於業務或倉管人員核對。
+     */
     SELECT
-        mp.organization_code,
-        wd.name                 AS delivery_name,
-        ooha.order_number,
-        msib.segment1           AS item_number,
-        wdd.subinventory,
-        wdd.requested_quantity,
-        (
-            SELECT
-                SUM(moq.transaction_quantity)
-            FROM
-                mtl_onhand_quantities moq
-            WHERE
-                moq.inventory_item_id = wdd.inventory_item_id
-                AND moq.organization_id = wdd.organization_id
-                AND moq.subinventory_code = wdd.subinventory
-        ) AS onhand_quantity,
-        CASE
-            WHEN (
-                SELECT SUM(moq.transaction_quantity)
-                FROM mtl_onhand_quantities moq
-                WHERE moq.inventory_item_id = wdd.inventory_item_id
-                  AND moq.organization_id = wdd.organization_id
-                  AND moq.subinventory_code = wdd.subinventory
-            ) >= wdd.requested_quantity THEN 'Sufficient'
-            ELSE 'Shortage'
-        END AS inventory_status
+        WND.NAME                AS DELIVERY_NAME,
+        OOHA.ORDER_NUMBER,
+        OOTA.NAME               AS ORDER_TYPE,
+        OOLA.LINE_NUMBER || '.' || OOLA.SHIPMENT_NUMBER AS ORDER_LINE,
+        MSI.SEGMENT1            AS ITEM_NUMBER,
+        WDD.REQUESTED_QUANTITY,
+        RS.SALESREP_NAME        AS SALESPERSON,
+        AC.CUSTOMER_NAME
     FROM
-        wsh_deliveries           wd
-    JOIN wsh_delivery_assignments wda ON wd.delivery_id = wda.delivery_id
-    JOIN wsh_delivery_details     wdd ON wda.delivery_detail_id = wdd.delivery_detail_id
-    JOIN oe_order_headers_all     ooha ON wdd.source_header_id = ooha.header_id
-    JOIN mtl_system_items_b       msib ON wdd.inventory_item_id = msib.inventory_item_id
-                                      AND wdd.organization_id = msib.organization_id
-    JOIN mtl_parameters           mp ON wd.organization_id = mp.organization_id
+        WSH_NEW_DELIVERIES         WND
+        JOIN WSH_DELIVERY_ASSIGNMENTS   WDA ON WND.DELIVERY_ID = WDA.DELIVERY_ID
+        JOIN WSH_DELIVERY_DETAILS       WDD ON WDA.DELIVERY_DETAIL_ID = WDD.DELIVERY_DETAIL_ID
+        JOIN OE_ORDER_LINES_ALL         OOLA ON WDD.SOURCE_LINE_ID = OOLA.LINE_ID
+        JOIN OE_ORDER_HEADERS_ALL       OOHA ON OOLA.HEADER_ID = OOHA.HEADER_ID
+        JOIN OE_TRANSACTION_TYPES_TL    OOTA ON OOHA.ORDER_TYPE_ID = OOTA.TRANSACTION_TYPE_ID AND OOTA.LANGUAGE = USERENV('LANG')
+        JOIN AR_CUSTOMERS               AC ON WND.CUSTOMER_ID = AC.CUSTOMER_ID
+        JOIN MTL_SYSTEM_ITEMS_B         MSI ON WDD.INVENTORY_ITEM_ID = MSI.INVENTORY_ITEM_ID AND WDD.ORGANIZATION_ID = MSI.ORGANIZATION_ID
+        LEFT JOIN RA_SALESREPS          RS ON OOHA.SALESREP_ID = RS.SALESREP_ID AND OOHA.ORG_ID = RS.ORG_ID
     WHERE
-        wd.planned_flag = 'Y'
-        AND wd.status_code <> 'CL'
-        AND wdd.released_status IN ('R', 'B')
-        -- 參數化查詢
-        AND mp.organization_code = :p_org_code -- 參數：庫存組織
-    ORDER BY
-        mp.organization_code,
-        inventory_status,
-        wd.name;
+        WDD.SOURCE_CODE = 'OE' -- 確保來源是訂單管理
+        AND WND.DELIVERY_ID = :P_DELIVERY_ID; -- 輸入特定出貨單 ID
     ```
