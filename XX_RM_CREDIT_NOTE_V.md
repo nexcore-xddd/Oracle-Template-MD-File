@@ -1,178 +1,138 @@
-### TEMPLATE_ID: XX_RM_CREDIT_NOTE_V
-- **用途**：此 View 用於查詢由退貨授權（RMA）流程產生的應收帳款（AR）貸項通知單（Credit Memo）明細。它整合了訂單管理（OM）、應收帳款（AR）及庫存（INV）模組的資料，提供完整的退貨財務資訊，支援財務對帳與退貨原因分析等業務場景。
+### RM.XX_RM_CREDIT_NOTE_V
+- **用途**：查詢因客戶退貨 (RMA) 所產生的應收貸項通知單 (Credit Note) 明細。此視圖整合了標準 AR 貸項通知單及已拋轉至應付 (AP) 模組的貸項通知單，主要用於銷貨折讓 (Rebate) 金額的計算與沖銷。
 - **角色**：主表
 - **關鍵 Foreign Keys (輸出介面)**：
     - **核心業務關聯**：
-        - `ra_customer_trx_lines_all.interface_line_attribute6` -> `oe_order_lines_all.line_id` (將 AR Credit Memo 行連結至來源 OM RMA 訂單行)
-        - `ra_customer_trx_all.customer_trx_id` -> `ra_customer_trx_lines_all.customer_trx_id` (AR 交易主檔與明細行關聯)
-        - `oe_order_lines_all.header_id` -> `oe_order_headers_all.header_id` (OM 訂單明細行與主檔關聯)
-        - `ra_customer_trx_all.bill_to_customer_id` -> `hz_cust_accounts.cust_account_id` (AR 交易與客戶主檔關聯)
+        - `ra_customer_trx_lines_all.interface_line_attribute6` -> `oe_order_lines_all.line_id` (從 AR Credit Memo 行關聯回原始 RMA 訂單行)
+        - `ap_invoice_lines_all.attribute4` -> `ra_customer_trx_all.customer_trx_id` (從 AP 發票行關聯回已轉 AP 的 AR Credit Memo)
+        - `ra_customer_trx_all.customer_trx_id` -> `ra_customer_trx_lines_all.customer_trx_id` (AR 交易主檔與行)
+        - `oe_order_lines_all.header_id` -> `oe_order_headers_all.header_id` (訂單主檔與行)
     - **維度關聯**：
-        - `ra_customer_trx_lines_all.inventory_item_id` -> `mtl_system_items_b.inventory_item_id` (關聯至庫存料號主檔)
-        - `ra_customer_trx_all.org_id` -> 對應至營運單位 (Operating Unit)
-        - `ra_cust_trx_line_gl_dist_all.code_combination_id` -> 對應至總帳科目組合 (GL Code Combinations)
+        - `ra_customer_trx_all.bill_to_customer_id` -> `hz_cust_accounts.cust_account_id` (關聯至客戶主檔)
+        - `ra_customer_trx_lines_all.inventory_item_id` -> `mtl_system_items_b.inventory_item_id` (關聯至料號主檔)
 - **關鍵欄位說明 (Field Metadata)**：
-    - **`gd.gl_date` (GL_DATE)**：
-        - **用途**：此貸項通知單在總帳（GL）中的會計過帳日期。
+    - **`ra_cust_trx_line_gl_dist_all.gl_date` ([REVERSAL_PERIOD])**：
+        - **用途**：Credit Memo 的總帳日期，格式化為 'MON-RR'，代表沖銷的會計期間。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`ABS (rd.acctd_amount)` (ACCTD_AMOUNT)**：
-        - **用途**：此貸項通知單在本位幣下的沖銷金額，取絕對值。
+    - **`xx_rm_lib_pkg.get_accrual_period(...)` ([ACCRUAL_PERIOD])**：
+        - **用途**：透過客製邏輯，根據退貨單的相關屬性，計算出應沖銷的原始銷貨折讓預提期間。
+        - **代碼映射 (Mapping)**：不適用
+        - **強制規則**：此欄位為銷貨折讓計算的核心邏輯。
+    - **`ra_cust_trx_line_gl_dist_all.acctd_amount` ([ACCTD_AMOUNT])**：
+        - **用途**：Credit Memo 在總帳中的入帳金額 (已換算為功能性貨幣)，代表實際沖銷的金額。
+        - **代碼映射 (Mapping)**：不適用
+        - **強制規則**：取絕對值。
+    - **`mtl_system_items_b.segment1` ([ITEM])**：
+        - **用途**：退貨的料號。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`oh.order_number` (RMA_NO)**：
-        - **用途**：來源退貨授權（RMA）的訂單號碼。
+    - **`oe_order_lines_all.return_reason_code` ([REASON_CODE])**：
+        - **用途**：RMA 訂單行上的退貨原因代碼，用於判斷此筆退貨是否需要納入銷貨折讓計算。
+        - **代碼映射 (Mapping)**：`FND_LOOKUP_VALUES` (Lookup Type: `XX_OM_REBATE_INCLUDE_REASON`)
+        - **強制規則**：View 的邏輯已過濾僅包含特定 Lookup 中的原因碼。
+    - **`oe_order_headers_all.order_number` ([RMA_NO])**：
+        - **用途**：此筆 Credit Memo 關聯的退貨授權單 (RMA) 號碼。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`ct.trx_number` (AR_TRX_NO)**：
-        - **用途**：應收帳款系統產生的貸項通知單（Credit Memo）交易號碼。
+    - **`ra_customer_trx_all.trx_number` ([AR_TRX_NO])**：
+        - **用途**：應收模組的貸項通知單 (Credit Memo) 交易號碼。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`ol.return_reason_code` (REASON_CODE)**：
-        - **用途**：客戶退貨的原因代碼，記錄於 RMA 訂單行。
-        - **代碼映射 (Mapping)**：`OE_RETURN_REASONS`
-        - **強制規則**：不適用
-    - **`oh.attribute5` (SOURCE_FROM)**：
-        - **用途**：記錄於 RMA 訂單主檔的彈性欄位，用於標示退貨來源或專案類型（例如：CPOR / SPOR / MDF）。
+    - **`ra_cust_trx_types_all.name` ([NAME])**：
+        - **用途**：應收交易類型名稱，例如 "國內銷退折讓"。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
+
 - **範例 SQL**：
 
     層次一：直接使用 View 的查詢範例
     ```sql
     /*
-     * 情境：財務人員需要快速查詢特定客戶在指定會計期間內的所有貸項通知單明細，
-     * 以便進行月底對帳或客戶退款分析。
-     * 此查詢直接使用 XX_RM_CREDIT_NOTE_V，篩選客戶編號與 GL 期間。
+     * 情境：快速查詢特定客戶在某個會計月份內，所有影響銷貨折讓 (Rebate) 的貸項通知單 (Credit Note) 紀錄。
+     * 適用於財務或業務人員快速核對當期沖銷金額。
      */
     SELECT
-        gl_date,
-        reversal_period,
         account_number,
         rma_no,
         ar_trx_no,
         item,
-        reason_code,
         acctd_amount,
-        currency_code
+        reversal_period,
+        accrual_period,
+        reason_code
     FROM
-        xx_rm_credit_note_v
+        XX_RM_CREDIT_NOTE_V
     WHERE
-        account_number = :p_customer_number -- 輸入客戶編號, e.g., '12345'
-        AND reversal_period = :p_gl_period     -- 輸入 GL 期間, e.g., 'MAY-24'
-    ORDER BY
-        gl_date DESC,
-        rma_no;
+        reversal_period = :p_reversal_period  -- e.g., 'AUG-24'
+        AND account_number = :p_account_number; -- e.g., 'C1001'
+
     ```
 
     層次二：拆解 View 背後 Table 的串接範例
     ```sql
     /*
-     * 情境：需要分析退貨的原始銷售訂單資訊，但 XX_RM_CREDIT_NOTE_V 並未包含此欄位。
-     * 因此，我們需要拆解 View，從 RMA 訂單行 (oe_order_lines_all) 的退貨參考屬性，
-     * 追溯回原始的銷售訂單主檔 (oe_order_headers_all)，以取得原始訂單號碼。
+     * 情境：當需要查詢 View 未提供的欄位 (例如 RMA 訂單頭的訂購日期 ordered_date) 或需針對特定條件進行效能調校時，
+     * 可拆解 View，直接串接核心的應收 (AR) 與訂單管理 (OM) 表格。
+     * 此範例僅重現 View 中第一段 UNION ALL 的核心邏輯。
      */
     SELECT
-        ct.trx_number        AS ar_trx_no,
-        oh_rma.order_number  AS rma_no,
-        so_header.order_number AS original_so_number, -- 原始銷售訂單號碼
         hca.account_number,
-        gd.gl_date,
-        msi.segment1         AS item,
-        ABS(gd.acctd_amount) AS acctd_amount
+        ooh.order_number AS rma_no,
+        ooh.ordered_date AS rma_order_date, -- View 未提供的額外欄位
+        rct.trx_number AS ar_trx_no,
+        msi.segment1 AS item,
+        ABS(rgd.acctd_amount) AS acctd_amount
     FROM
-        ra_customer_trx_all          ct,
-        ra_customer_trx_lines_all    rl,
-        ra_cust_trx_line_gl_dist_all gd,
-        oe_order_lines_all           ol_rma,
-        oe_order_headers_all         oh_rma,
+        ra_customer_trx_all          rct,
+        ra_customer_trx_lines_all    rtl,
+        ra_cust_trx_line_gl_dist_all rgd,
+        oe_order_headers_all         ooh,
+        oe_order_lines_all           ool,
         hz_cust_accounts             hca,
-        mtl_system_items_b           msi,
-        oe_order_lines_all           so_line,   -- 原始銷售訂單行
-        oe_order_headers_all         so_header  -- 原始銷售訂單主檔
+        mtl_system_items_b           msi
     WHERE
-        ct.customer_trx_id = rl.customer_trx_id
-        AND rl.customer_trx_line_id = gd.customer_trx_line_id
-        AND ct.bill_to_customer_id = hca.cust_account_id
-        AND rl.inventory_item_id = msi.inventory_item_id
-        AND rl.warehouse_id = msi.organization_id
-        AND TO_CHAR(ol_rma.line_id) = rl.interface_line_attribute6
-        AND ol_rma.header_id = oh_rma.header_id
-        AND ct.cust_trx_type_id IN (
-            SELECT
-                cust_trx_type_id
-            FROM
-                ra_cust_trx_types_all
-            WHERE
-                type = 'CM'
-        )
-        AND gd.account_class = 'REC'
-        -- 核心串接邏輯：透過 RMA 行的 return context 和 attributes 找到原始銷售訂單
-        AND ol_rma.return_context = 'ORDER'
-        AND ol_rma.return_attribute1 = TO_CHAR(so_header.header_id)
-        AND ol_rma.return_attribute2 = TO_CHAR(so_line.line_id)
-        AND so_line.header_id = so_header.header_id
-        -- 篩選條件
-        AND ct.org_id = :p_org_id -- 輸入 OU ID
-        AND gd.gl_date BETWEEN :p_start_date AND :p_end_date;
+        rct.customer_trx_id = rtl.customer_trx_id
+        AND rtl.customer_trx_id = rgd.customer_trx_id
+        AND rtl.customer_trx_line_id = rgd.customer_trx_line_id
+        AND rtl.interface_line_attribute6 = ool.line_id -- 核心關聯：從 AR CM 行關聯回 RMA 訂單行
+        AND ool.header_id = ooh.header_id
+        AND rct.bill_to_customer_id = hca.cust_account_id
+        AND rtl.inventory_item_id = msi.inventory_item_id
+        AND rtl.warehouse_id = msi.organization_id
+        AND rct.complete_flag = 'Y'
+        AND rgd.account_class = 'REC'
+        AND rct.trx_number = :p_ar_trx_no; -- e.g., '81000123'
+
     ```
 
     層次三：跨業務情境的延伸串接範例
     ```sql
     /*
-     * 情境：產品品質經理希望分析特定產品線的退貨原因，並結合目前的庫存數量與標準成本，
-     * 以評估退貨對庫存及財務造成的雙重影響，找出造成高成本損失的品質問題。
-     * 此查詢將 Credit Note 資料與庫存成本 (cst_item_costs) 及在手庫存 (mtl_onhand_quantities_detail) 進行串接。
+     * 情境：延伸查詢，追蹤貸項通知單 (Credit Note) 對應的退貨授權單 (RMA)，並進一步關聯回產生該退貨的「原始銷售訂單」。
+     * 此情境適用於分析特定原始訂單的退貨率，或核對退貨原因與原始銷售細節是否相符。
      */
-    WITH credit_note_base AS (
-        -- 先從 View 取得基礎退貨資料
-        SELECT
-            v.product_line_code,
-            v.item,
-            v.reason_code,
-            rl.inventory_item_id,
-            rl.warehouse_id AS organization_id,
-            SUM(v.acctd_amount) AS total_return_amount
-        FROM
-            xx_rm_credit_note_v v
-            JOIN ra_customer_trx_lines_all rl ON v.customer_trx_line_id = rl.customer_trx_line_id
-        WHERE
-            v.gl_date >= ADD_MONTHS(TRUNC(SYSDATE, 'MM'), -3) -- 分析最近三個月的資料
-            AND v.product_line_code = :p_product_line -- 指定產品線
-        GROUP BY
-            v.product_line_code,
-            v.item,
-            v.reason_code,
-            rl.inventory_item_id,
-            rl.warehouse_id
-    )
     SELECT
-        cn.product_line_code,
-        cn.item,
-        cn.reason_code,
-        cn.total_return_amount,
-        cic.item_cost,
-        (cn.total_return_amount / cic.item_cost) AS returned_units_equivalent, -- 約當退貨數量
-        NVL(onhand.on_hand_quantity, 0) AS current_on_hand_quantity
+        hca.account_number,
+        orig_ooh.order_number AS original_so_number, -- 原始銷售訂單號碼
+        orig_ooh.ordered_date AS original_so_date,   -- 原始訂單日期
+        rma_ooh.order_number AS rma_no,               -- RMA 號碼
+        rct.trx_number AS ar_trx_no,                  -- Credit Note 號碼
+        msi.segment1 AS item,
+        rma_ool.ordered_quantity AS return_qty,       -- 退貨數量
+        ABS(rgd.acctd_amount) AS credited_amount      -- 貸項金額
     FROM
-        credit_note_base cn
-        -- 串接物料成本
-        LEFT JOIN cst_item_costs cic ON cn.inventory_item_id = cic.inventory_item_id
-                                    AND cn.organization_id = cic.organization_id
-                                    AND cic.cost_type_id = 1 -- Frozen Standard Cost
-        -- 串接在手庫存
-        LEFT JOIN (
-            SELECT
-                inventory_item_id,
-                organization_id,
-                SUM(primary_transaction_quantity) AS on_hand_quantity
-            FROM
-                mtl_onhand_quantities_detail
-            GROUP BY
-                inventory_item_id,
-                organization_id
-        ) onhand ON cn.inventory_item_id = onhand.inventory_item_id
-                    AND cn.organization_id = onhand.organization_id
-    ORDER BY
-        cn.total_return_amount DESC;
+        ra_customer_trx_all          rct
+    JOIN ra_customer_trx_lines_all    rtl ON rct.customer_trx_id = rtl.customer_trx_id
+    JOIN ra_cust_trx_line_gl_dist_all rgd ON rtl.customer_trx_line_id = rgd.customer_trx_line_id
+    JOIN oe_order_lines_all           rma_ool ON rtl.interface_line_attribute6 = rma_ool.line_id -- 關聯至 RMA 行
+    JOIN oe_order_headers_all         rma_ooh ON rma_ool.header_id = rma_ooh.header_id
+    JOIN oe_order_lines_all           orig_ool ON rma_ool.reference_line_id = orig_ool.line_id -- 從 RMA 行關聯回原始訂單行
+    JOIN oe_order_headers_all         orig_ooh ON orig_ool.header_id = orig_ooh.header_id
+    JOIN hz_cust_accounts             hca ON rct.bill_to_customer_id = hca.cust_account_id
+    JOIN mtl_system_items_b           msi ON rtl.inventory_item_id = msi.inventory_item_id AND rtl.warehouse_id = msi.organization_id
+    WHERE
+        rct.org_id = :p_org_id
+        AND orig_ooh.order_number = :p_original_so_number; -- 以原始銷售訂單號碼查詢所有相關退貨與貸項
+
     ```
