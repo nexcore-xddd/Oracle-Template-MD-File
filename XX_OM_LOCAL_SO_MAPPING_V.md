@@ -1,35 +1,28 @@
 ### TEMPLATE_ID: OM.XX_OM_LOCAL_SO_MAPPING_V
-- **用途**：查詢原始銷售訂單與其對應在不同營運單位（OU）下建立的本地銷售訂單之間的關聯。此視圖用於追蹤跨公司或內部交易流程，提供原始訂單、本地訂單、以及各自對應的出貨單號（DN），支援跨OU的訂單履行與對帳作業。
+- **用途**：查詢跨營運中心（OU）的內部銷售訂單對應關係。此視圖主要用於追蹤原始客戶訂單如何觸發內部另一家公司（Local OU）生成對應的銷售訂單，並關聯雙方的出貨單號（DN），以支援集團內部交易的對帳與流程追蹤。
 - **角色**：主表
 - **關鍵 Foreign Keys (輸出介面)**：
-    - **核心業務關聯**：`oe_order_lines_all.line_id` -> `oe_order_lines_all.source_document_line_id` (本地訂單行關聯到原始訂單行)
-    - **核心業務關聯**：`wsh_delivery_details.source_header_id` -> `oe_order_headers_all.header_id` (訂單頭與出貨明細關聯)
-    - **核心業務關聯**：`wsh_delivery_details.source_line_id` -> `oe_order_lines_all.line_id` (訂單行與出貨明細關聯)
-    - **維度關聯**：`oe_order_headers_all.org_id` -> `hr_all_organization_units.organization_id` (查詢 OU 對應的帳本資訊)
+    - **核心業務關聯**：`oe_order_lines_all.line_id` -> `oe_order_lines_all.source_document_line_id` (原始訂單行 關聯至 內部訂單行的來源)
+    - **核心業務關聯**：`oe_order_lines_all.line_id` -> `wsh_delivery_details.source_line_id` (銷售訂單行 關聯至 出貨明細行)
+    - **核心業務關聯**：`wsh_delivery_details.delivery_detail_id` -> `wsh_delivery_assignments.delivery_detail_id` (出貨明細行 關聯至 出貨分配)
+    - **核心業務關聯**：`wsh_delivery_assignments.delivery_id` -> `wsh_new_deliveries.delivery_id` (出貨分配 關聯至 出貨單頭)
+    - **維度關聯**：`oe_order_headers_all.org_id` -> 營運中心 ID，用於查詢對應的帳本資訊
 - **關鍵欄位說明 (Field Metadata)**：
-    - **`cux.xx_om_copy_order_mapping_rule.from_ship_to_location_id` ([LOCAL_BILLING_FLAG])**：
-        - **用途**：基於客製對應規則表，判斷此筆訂單是否觸發本地開帳流程的旗標 ('1' 表示是)。
+    - **`oe_order_headers_all.order_number`**：
+        - **用途**：銷售訂單號碼。在視圖中分為 `orig_order_number` (原始訂單) 和 `local_order_number` (內部訂單)。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`oe_order_headers_all.ORDER_NUMBER` ([ORIG_ORDER_NUMBER])**：
-        - **用途**：原始銷售訂單的訂單號碼。
+    - **`oe_order_lines_all.source_document_line_id`**：
+        - **用途**：內部銷售訂單行上的欄位，用於記錄其來源的原始客戶銷售訂單行的 line_id。這是實現訂單追蹤的核心關聯欄位。
+        - **代碼映射 (Mapping)**：對應到另一筆訂單的 `oe_order_lines_all.line_id`。
+        - **強制規則**：不適用
+    - **`wsh_new_deliveries.name`**：
+        - **用途**：出貨單號（Delivery Note, DN）。在視圖中分為 `orig_dn` (原始訂單的出貨單) 和 `local_dn` (內部訂單的出貨單)。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`oe_order_headers_all.ORDER_NUMBER` ([LOCAL_ORDER_NUMBER])**：
-        - **用途**：在不同營運單位下，因應原始訂單而產生的本地銷售訂單號碼。
-        - **代碼映射 (Mapping)**：不適用
-        - **強制規則**：不適用
-    - **`oe_order_lines_all.SOURCE_DOCUMENT_LINE_ID` ([LOCAL_OOL.SOURCE_DOCUMENT_LINE_ID])**：
-        - **用途**：本地訂單行記錄的來源文件行ID，直接指向原始銷售訂單的 `oe_order_lines_all.line_id`，是兩者之間最主要的關聯鍵。
-        - **代碼映射 (Mapping)**：不適用
-        - **強制規則**：此為 Oracle EBS 自動產生的關聯，用於訂單複製或 Drop Ship 流程。
-    - **`wsh_new_deliveries.NAME` ([ORIG_DN])**：
-        - **用途**：與原始銷售訂單行關聯的交運單（Delivery Note）號碼。
-        - **代碼映射 (Mapping)**：不適用
-        - **強制規則**：不適用
-    - **`wsh_new_deliveries.NAME` ([LOCAL_DN])**：
-        - **用途**：與本地銷售訂單行關聯的交運單（Delivery Note）號碼。
-        - **代碼映射 (Mapping)**：不適用
+    - **`cux.xx_om_copy_order_mapping_rule.from_ship_to_location_id`**：
+        - **用途**：客製對應規則表中的「來源出貨地點」。用於判斷哪些客戶與出貨地點的組合需要觸發內部訂單的生成。
+        - **代碼映射 (Mapping)**：`hz_cust_site_uses_all.site_use_id`
         - **強制規則**：不適用
 
 - **範例 SQL**：
@@ -37,94 +30,81 @@
     層次一：直接使用 View 的查詢範例
     ```sql
     /*
-     * 情境：快速查詢特定原始銷售訂單所對應的本地訂單資訊。
-     * 這是在日常營運中，客服或訂單管理人員需要追蹤跨公司訂單狀態時最常見的用法。
+     * 情境：快速查詢特定原始客戶訂單所對應的內部訂單及雙方的出貨單號。
+     * 適用於日常營運人員追蹤單一訂單的內部履行狀態。
      */
-    SELECT 
-        V.ORIG_ORDER_NUMBER,
-        V.ORIG_LINE,
-        V.ORIG_DN,
-        V.LOCAL_ORDER_NUMBER,
-        V.LOCAL_LINE_NUMBER,
-        V.LOCAL_DN,
-        V.LAST_UPDATE_DATE
-    FROM 
-        XX_OM_LOCAL_SO_MAPPING_V V
-    WHERE 
-        V.ORIG_ORDER_NUMBER = :p_orig_order_number; -- 輸入原始銷售訂單號碼
+    SELECT
+        v.orig_ledger,
+        v.orig_order_number,
+        v.orig_line,
+        v.orig_dn,
+        v.local_ledger,
+        v.local_order_number,
+        v.local_line_number,
+        v.local_dn,
+        v.last_update_date
+    FROM
+        xx_om_local_so_mapping_v v
+    WHERE
+        v.orig_order_number = :p_order_number;
     ```
 
     層次二：拆解 View 背後 Table 的串接範例
     ```sql
     /*
-     * 情境：需要查詢原始訂單與本地訂單的客戶PO號碼或料號資訊，但這些欄位並未包含在 View 中。
-     * 透過直接串接核心的訂單頭/行表，可以更彈性地取得所需欄位，並避免 View 中複雜的 UNION ALL 邏輯可能帶來的效能影響。
+     * 情境：僅需查詢訂單層級的對應關係，不需出貨資訊，且想加入訂單狀態等 View 未提供的欄位。
+     * 適用於需要客製化查詢欄位或進行效能調校，繞過 View 的複雜邏輯。
+     * 此範例重現了 View 中基於 source_document_line_id 的核心串接邏輯。
      */
     SELECT
-        -- 原始訂單資訊
-        OOH_ORIG.ORDER_NUMBER AS ORIG_ORDER_NUMBER,
-        OOL_ORIG.LINE_NUMBER || '.' || OOL_ORIG.SHIPMENT_NUMBER AS ORIG_LINE,
-        OOL_ORIG.ORDERED_ITEM AS ORIG_ITEM,
-        OOH_ORIG.CUST_PO_NUMBER AS ORIG_CUST_PO,
-        -- 本地訂單資訊
-        OOH_LOCAL.ORDER_NUMBER AS LOCAL_ORDER_NUMBER,
-        OOL_LOCAL.LINE_NUMBER || '.' || OOL_LOCAL.SHIPMENT_NUMBER AS LOCAL_LINE,
-        OOL_LOCAL.ORDERED_ITEM AS LOCAL_ITEM,
-        OOH_LOCAL.CUST_PO_NUMBER AS LOCAL_CUST_PO
+        ooh_orig.order_number      AS orig_order_number,
+        ooh_orig.flow_status_code  AS orig_order_status,
+        ool_orig.line_number       AS orig_line_number,
+        ooh_local.order_number     AS local_order_number,
+        ooh_local.flow_status_code AS local_order_status,
+        ool_local.line_number      AS local_line_number
     FROM
-        OE_ORDER_HEADERS_ALL OOH_ORIG,
-        OE_ORDER_LINES_ALL   OOL_ORIG,
-        OE_ORDER_LINES_ALL   OOL_LOCAL,
-        OE_ORDER_HEADERS_ALL OOH_LOCAL
+        oe_order_headers_all ooh_orig,
+        oe_order_lines_all   ool_orig,
+        oe_order_headers_all ooh_local,
+        oe_order_lines_all   ool_local
     WHERE
-        OOH_ORIG.HEADER_ID = OOL_ORIG.HEADER_ID
-        AND OOL_ORIG.LINE_ID = OOL_LOCAL.SOURCE_DOCUMENT_LINE_ID -- 核心關聯：透過來源文件行ID串接
-        AND OOL_LOCAL.HEADER_ID = OOH_LOCAL.HEADER_ID
-        AND OOH_ORIG.ORG_ID != OOH_LOCAL.ORG_ID -- 確保是跨OU的訂單
-        AND OOH_ORIG.ORDER_NUMBER = :p_orig_order_number; -- 輸入原始銷售訂單號碼
+        ooh_orig.header_id = ool_orig.header_id
+        AND ool_local.source_document_line_id = ool_orig.line_id -- 核心關聯：透過來源單據行ID找到對應訂單
+        AND ooh_local.header_id = ool_local.header_id
+        AND ooh_local.org_id <> ooh_orig.org_id -- 確保是跨OU的交易
+        AND ooh_orig.order_number = :p_order_number;
     ```
 
     層次三：跨業務情境的延伸串接範例
     ```sql
     /*
-     * 情境：進行完整的跨公司訂單到收款（Order-to-Cash）流程對帳。
-     * 除了追蹤訂單對應關係，還需要進一步查詢原始訂單與本地訂單是否都已成功開立應收發票（AR Invoice）。
-     * 此查詢將訂單資訊與應收帳款模組的發票主檔與明細檔進行串接，以提供端到端的業務視圖。
+     * 情境：追蹤從原始客戶訂單、內部訂單，一直到最終應收帳款發票的完整「訂單到現金」(Order-to-Cash) 流程。
+     * 適用於財務或審計人員，需要核對集團內部交易的訂單流與金流是否一致。
      */
     SELECT
-        -- 訂單資訊
-        OOH_ORIG.ORDER_NUMBER AS ORIG_ORDER_NUMBER,
-        OOH_LOCAL.ORDER_NUMBER AS LOCAL_ORDER_NUMBER,
-        -- 原始訂單的應收發票資訊
-        AR_TRX_ORIG.TRX_NUMBER AS ORIG_INVOICE_NUMBER,
-        AR_TRX_ORIG.TRX_DATE AS ORIG_INVOICE_DATE,
-        -- 本地訂單的應收發票資訊
-        AR_TRX_LOCAL.TRX_NUMBER AS LOCAL_INVOICE_NUMBER,
-        AR_TRX_LOCAL.TRX_DATE AS LOCAL_INVOICE_DATE
+        ooh_orig.order_number      AS orig_order_number,
+        ooh_orig.org_id            AS orig_ou_id,
+        ooh_local.order_number     AS local_order_number,
+        ooh_local.org_id           AS local_ou_id,
+        inv_local.trx_number       AS local_ar_invoice_num, -- 內部訂單對應的 AR 發票
+        inv_local.trx_date         AS local_invoice_date
     FROM
-        OE_ORDER_HEADERS_ALL OOH_ORIG
-    JOIN
-        OE_ORDER_LINES_ALL OOL_ORIG ON OOH_ORIG.HEADER_ID = OOL_ORIG.HEADER_ID
-    JOIN
-        OE_ORDER_LINES_ALL OOL_LOCAL ON OOL_ORIG.LINE_ID = OOL_LOCAL.SOURCE_DOCUMENT_LINE_ID
-    JOIN
-        OE_ORDER_HEADERS_ALL OOH_LOCAL ON OOL_LOCAL.HEADER_ID = OOH_LOCAL.HEADER_ID
-    -- 串接原始訂單的AR發票
-    LEFT JOIN
-        RA_CUSTOMER_TRX_LINES_ALL AR_TRX_L_ORIG 
-        ON AR_TRX_L_ORIG.INTERFACE_LINE_CONTEXT = 'ORDER ENTRY'
-        AND AR_TRX_L_ORIG.INTERFACE_LINE_ATTRIBUTE1 = TO_CHAR(OOH_ORIG.HEADER_ID)
-        AND AR_TRX_L_ORIG.INTERFACE_LINE_ATTRIBUTE6 = TO_CHAR(OOL_ORIG.LINE_ID)
-    LEFT JOIN
-        RA_CUSTOMER_TRX_ALL AR_TRX_ORIG ON AR_TRX_L_ORIG.CUSTOMER_TRX_ID = AR_TRX_ORIG.CUSTOMER_TRX_ID
-    -- 串接本地訂單的AR發票
-    LEFT JOIN
-        RA_CUSTOMER_TRX_LINES_ALL AR_TRX_L_LOCAL
-        ON AR_TRX_L_LOCAL.INTERFACE_LINE_CONTEXT = 'ORDER ENTRY'
-        AND AR_TRX_L_LOCAL.INTERFACE_LINE_ATTRIBUTE1 = TO_CHAR(OOH_LOCAL.HEADER_ID)
-        AND AR_TRX_L_LOCAL.INTERFACE_LINE_ATTRIBUTE6 = TO_CHAR(OOL_LOCAL.LINE_ID)
-    LEFT JOIN
-        RA_CUSTOMER_TRX_ALL AR_TRX_LOCAL ON AR_TRX_L_LOCAL.CUSTOMER_TRX_ID = AR_TRX_LOCAL.CUSTOMER_TRX_ID
+        oe_order_headers_all      ooh_orig,
+        oe_order_lines_all        ool_orig,
+        oe_order_headers_all      ooh_local,
+        oe_order_lines_all        ool_local,
+        ra_customer_trx_all       inv_local, -- 內部訂單的 AR 發票頭
+        ra_customer_trx_lines_all invl_local -- 內部訂單的 AR 發票行
     WHERE
-        OOH_ORIG.ORDER_NUMBER = :p_orig_order_number; -- 輸入原始銷售訂單號碼
+        ooh_orig.header_id = ool_orig.header_id
+        AND ool_local.source_document_line_id = ool_orig.line_id
+        AND ooh_local.header_id = ool_local.header_id
+        -- 將內部訂單行關聯到 AR 發票行
+        AND invl_local.interface_line_context = 'ORDER ENTRY'
+        AND invl_local.interface_line_attribute1 = to_char(ooh_local.order_number)
+        AND invl_local.interface_line_attribute6 = to_char(ool_local.line_id)
+        AND inv_local.customer_trx_id = invl_local.customer_trx_id
+        AND inv_local.org_id = ooh_local.org_id -- 發票與訂單需在同一個 OU
+        AND ooh_orig.order_number = :p_order_number;
     ```
