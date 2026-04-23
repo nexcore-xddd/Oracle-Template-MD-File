@@ -1,38 +1,25 @@
 ### TEMPLATE_ID: PO.XX_PO_RETROACTIVE_PRICE_V
-- **用途**：查詢採購單的追溯價格調整記錄。此 View 整合了價格更新請求的驗證階段與執行結果，支援採購人員與系統管理員追蹤特定 PO 行的價格變動歷史與當前狀態。
+- **用途**：此 View 用於查詢採購單（PO）的追溯性價格調整記錄。它整合了待系統驗證的價格更新請求（Type 1）與已執行的價格重置（Reset）記錄（Type 2），方便採購人員追蹤與管理因議價或其他因素導致的價格變更。
 - **角色**：主表
 - **關鍵 Foreign Keys (輸出介面)**：
     - **核心業務關聯**：`XX_PO_PRICE_UPDATE_T.PO_LINE_ID` -> `PO_LINES_ALL.PO_LINE_ID`
-    - **維度關聯**：`XX_PO_PRICE_UPDATE_T.ORG_ID` -> 營運中心 (Operating Unit)
-    - **維度關聯**：`XX_PO_LINE_LOCATIONS_ALL_V.SHIP_TO_ORGANIZATION_ID` -> 庫存組織 (Inventory Organization)
+    - **維度關聯**：`XX_PO_PRICE_UPDATE_T.ORG_ID` -> `XX_HR_OPERATING_UNITS_V.ORG_ID` (營運單位資訊)
+    - **維度關聯**：`XX_PO_LINE_LOCATIONS_ALL_V.SHIP_TO_ORGANIZATION_ID` -> `XX_ORGANIZATION_DEFINITIONS_V.ORGANIZATION_ID` (庫存組織資訊)
 - **關鍵欄位說明 (Field Metadata)**：
-    - **`XX_PO_PRICE_UPDATE_T.PO_NUMBER` (PO_NUMBER)**：
-        - **用途**：受價格調整影響的採購單號碼。
+    - **`XX_PO_PRICE_UPDATE_T.PO_NUMBER`**：
+        - **用途**：發生價格異動的採購單號碼。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-
-    - **`XX_PO_PRICE_UPDATE_T.OLD_PRICE` (OLD_PRICE)**：
-        - **用途**：採購單行上原始的採購單價。
+    - **`XX_PO_PRICE_UPDATE_T.OLD_PRICE`**：
+        - **用途**：採購單行在價格變更前的原始單價。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-
-    - **`XX_PO_PRICE_UPDATE_T.NEW_PRICE` (NEW_PRICE)**：
-        - **用途**：議價後或系統更新後的新採購單價。
+    - **`XX_PO_PRICE_UPDATE_T.NEW_PRICE`**：
+        - **用途**：建議調整或已更新的採購單行新單價。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-
-    - **`(Derived from logic)` (TYPE)**：
-        - **用途**：標示記錄類型，區分是待處理請求還是已執行的結果。
-        - **代碼映射 (Mapping)**：'1' = 價格調整驗證請求；'2' = 價格重置執行記錄。
-        - **強制規則**：不適用
-
-    - **`(Derived from logic)` (RESULT)**：
-        - **用途**：對於類型為 '2' 的記錄，顯示價格重置是否已執行。
-        - **代碼映射 (Mapping)**：'Y' = 已執行；'N' = 未執行。
-        - **強制規則**：僅在 `TYPE` = '2' 時有意義。
-
-    - **`XX_PO_PRICE_UPDATE_T.ACTION_TIME` (ACTION_DATE)**：
-        - **用途**：價格重置動作的實際執行日期。若為空，則取用 PO 行上的彈性欄位 `ATTRIBUTE2` 作為替代。
+    - **`PO_LINES_ALL.ATTRIBUTE3`**：
+        - **用途**：儲存在採購單行彈性欄位中的價格刷新日期（Refresh Date），作為價格更新時間的參考。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
 
@@ -41,10 +28,10 @@
     層次一：直接使用 View 的查詢範例
     ```sql
     /*
-     * 情境：採購人員需要快速查詢特定採購單（例如 'PO12345'）所有價格調整的請求與執行結果。
-     * 這個查詢可以直接使用本 View，方便地檢視所有相關記錄的狀態。
+     * 情境：快速查詢特定營運單位(OU)下，某張採購單的所有追溯性價格變更記錄。
+     * 適合：使用者需要快速查看某筆PO的價格調整歷史，包含待處理和已完成的項目。
      */
-    SELECT
+    SELECT 
         V.OU_NAME,
         V.PO_NUMBER,
         V.LINE_NUM,
@@ -52,79 +39,98 @@
         V.ITEM_DESCRIPTION,
         V.OLD_PRICE,
         V.NEW_PRICE,
-        DECODE(V.TYPE, '1', '驗證請求', '2', '執行紀錄', '未知') AS RECORD_TYPE,
+        -- TYPE '1'為待驗證報價，'2'為已執行重置
+        DECODE(V.TYPE, '1', '待驗證', '2', '已重置', V.TYPE) AS STATUS,
         V.ACTION_DATE,
-        DECODE(V.TYPE, '2', V.RESULT, 'N/A') AS EXECUTION_RESULT,
-        V.REMARK,
-        V.EXECUTION_DATE
-    FROM
+        V.EXECUTION_DATE,
+        V.BUYER
+    FROM 
         XX_PO_RETROACTIVE_PRICE_V V
-    WHERE
-        V.PO_NUMBER = :p_po_number
-    ORDER BY
-        V.PO_NUMBER,
-        V.LINE_NUM,
+    WHERE 
+        V.OU_CODE = :p_ou_code -- e.g., 'OU_TW'
+        AND V.PO_NUMBER = :p_po_number -- e.g., '123456'
+    ORDER BY 
+        V.PO_NUMBER, 
+        V.LINE_NUM, 
         V.EXECUTION_DATE DESC;
     ```
 
     層次二：拆解 View 背後 Table 的串接範例
     ```sql
     /*
-     * 情境：需要查詢價格調整記錄，並同時取得標準採購單主檔的核准狀態(APPROVAL_STATUS)，
-     * 以及採購單行的允收允付設定(MATCH_OPTION)，這些欄位在 View 中未提供。
-     * 因此，我們直接串接核心的客製表與標準 PO 表。
+     * 情境：查詢特定供應商已執行的價格重置記錄，並需要取得標準採購單主檔(PO_HEADERS_ALL)的建立日期，
+     * 而此欄位 View 未提供。
+     * 適合：需要 View 未提供的欄位，或希望針對特定條件（如 ACTION = 'Reset'）進行更精確的查詢。
      */
     SELECT
-        XPUT.PO_NUMBER,
-        XPUT.LINE_NUM,
+        PHA.SEGMENT1 AS PO_NUMBER,
+        PHA.CREATION_DATE AS PO_CREATION_DATE,
+        PLA.LINE_NUM,
+        MSI.SEGMENT1 AS ITEM_CODE,
         XPUT.OLD_PRICE,
         XPUT.NEW_PRICE,
         XPUT.ACTION,
-        XPUT.REMARK,
-        XPUT.CREATION_DATE AS REQUEST_DATE,
-        POH.APPROVAL_STATUS, -- 從 PO Header 取得核准狀態
-        POL.MATCH_OPTION,    -- 從 PO Line 取得允收允付選項
-        MSI.SEGMENT1 AS ITEM_CODE,
-        MSI.DESCRIPTION AS ITEM_DESC
+        XPUT.ACTION_TIME
     FROM
-        XX_PO_PRICE_UPDATE_T     XPUT
-        JOIN PO_LINES_ALL        POL ON XPUT.PO_LINE_ID = POL.PO_LINE_ID
-        JOIN PO_HEADERS_ALL      POH ON POL.PO_HEADER_ID = POH.PO_HEADER_ID
-        JOIN PO_LINE_LOCATIONS_ALL PLL ON POL.PO_LINE_ID = PLL.PO_LINE_ID
-        JOIN MTL_SYSTEM_ITEMS_B    MSI ON PLL.ITEM_ID = MSI.INVENTORY_ITEM_ID
-                                       AND PLL.SHIP_TO_ORGANIZATION_ID = MSI.ORGANIZATION_ID
+        APPS.XX_PO_PRICE_UPDATE_T XPUT
+    JOIN
+        APPS.PO_LINES_ALL PLA ON XPUT.PO_LINE_ID = PLA.PO_LINE_ID
+    JOIN
+        APPS.PO_HEADERS_ALL PHA ON PLA.PO_HEADER_ID = PHA.PO_HEADER_ID
+    JOIN
+        APPS.MTL_SYSTEM_ITEMS_B MSI ON PLA.ITEM_ID = MSI.INVENTORY_ITEM_ID 
+                                     AND PHA.ORG_ID = MSI.ORGANIZATION_ID -- 假設在OU層級定義料號
     WHERE
-        XPUT.PO_NUMBER = :p_po_number
-        AND XPUT.VALIDATE_ONLY = 'N' -- 只查詢已執行的紀錄
-        AND ROWNUM = 1; -- 假設每個 PO Line Location 只有一筆，此處僅為範例
+        XPUT.VALIDATE_ONLY = 'N'
+        AND XPUT.ACTION = 'Reset' -- 直接篩選已重置的記錄
+        AND PHA.ORG_ID = :p_org_id -- 依營運單位ID篩選
+        AND PHA.VENDOR_ID = (SELECT VENDOR_ID FROM APPS.AP_SUPPLIERS WHERE VENDOR_NAME = :p_vendor_name) -- 依供應商名稱篩選
+    ORDER BY
+        PHA.SEGMENT1,
+        PLA.LINE_NUM;
     ```
 
     層次三：跨業務情境的延伸串接範例
     ```sql
     /*
-     * 情境：財務部門需要分析已完成價格調整的採購單，其對應的應付發票是否已經建立。
-     * 此查詢將價格調整記錄與 AP 模組的發票分配行(AP_INVOICE_DISTRIBUTIONS_ALL)關聯，
-     * 以便評估價格變更對已入帳發票的潛在影響。
+     * 情境：分析已執行價格追溯的採購單，其後續的接收與應付發票(AP Invoice)的金額是否與新價格一致，
+     * 以評估價格變更對後續財務流程的影響。
+     * 適合：進行跨模組的資料稽核，確保從採購、入庫到付款的資料一致性。
      */
     SELECT
-        XPUT.PO_NUMBER,
-        XPUT.LINE_NUM,
+        PHA.SEGMENT1 AS PO_NUMBER,
+        PLA.LINE_NUM,
         XPUT.OLD_PRICE,
         XPUT.NEW_PRICE,
-        (XPUT.NEW_PRICE - XPUT.OLD_PRICE) * POD.QUANTITY_ORDERED AS POTENTIAL_IMPACT,
+        XPUT.ACTION_TIME AS PRICE_RESET_DATE,
+        RT.TRANSACTION_DATE AS RECEIPT_DATE,
+        RT.QUANTITY AS RECEIPT_QTY,
         AIA.INVOICE_NUM,
         AIA.INVOICE_DATE,
-        AIA.INVOICE_AMOUNT,
-        APPS.AP_INVOICES_PKG.GET_APPROVAL_STATUS(AIA.INVOICE_ID, AIA.INVOICE_AMOUNT, AIA.PAYMENT_STATUS_FLAG, AIA.INVOICE_TYPE_LOOKUP_CODE) AS INVOICE_STATUS
+        AIDA.AMOUNT AS INVOICE_DIST_AMOUNT,
+        -- 比較發票行單價與PO新單價
+        CASE 
+            WHEN AIDA.QUANTITY_INVOICED <> 0 AND (AIDA.AMOUNT / AIDA.QUANTITY_INVOICED) = XPUT.NEW_PRICE THEN 'Y'
+            ELSE 'N'
+        END AS IS_PRICE_MATCHED
     FROM
-        XX_PO_PRICE_UPDATE_T          XPUT
-        JOIN PO_LINES_ALL             POL ON XPUT.PO_LINE_ID = POL.PO_LINE_ID
-        JOIN PO_DISTRIBUTIONS_ALL     POD ON POL.PO_LINE_ID = POD.PO_LINE_ID
-        LEFT JOIN AP_INVOICE_DISTRIBUTIONS_ALL AID ON POD.PO_DISTRIBUTION_ID = AID.PO_DISTRIBUTION_ID
-        LEFT JOIN AP_INVOICES_ALL              AIA ON AID.INVOICE_ID = AIA.INVOICE_ID
+        APPS.XX_PO_PRICE_UPDATE_T XPUT
+    JOIN
+        APPS.PO_LINES_ALL PLA ON XPUT.PO_LINE_ID = PLA.PO_LINE_ID
+    JOIN
+        APPS.PO_HEADERS_ALL PHA ON PLA.PO_HEADER_ID = PHA.PO_HEADER_ID
+    JOIN
+        APPS.PO_DISTRIBUTIONS_ALL PDA ON PLA.PO_LINE_ID = PDA.PO_LINE_ID
+    LEFT JOIN -- 從PO到接收
+        APPS.RCV_TRANSACTIONS RT ON PDA.PO_DISTRIBUTION_ID = RT.PO_DISTRIBUTION_ID AND RT.TRANSACTION_TYPE = 'RECEIVE'
+    LEFT JOIN -- 從PO到AP發票
+        APPS.AP_INVOICE_DISTRIBUTIONS_ALL AIDA ON PDA.PO_DISTRIBUTION_ID = AIDA.PO_DISTRIBUTION_ID
+    LEFT JOIN
+        APPS.AP_INVOICES_ALL AIA ON AIDA.INVOICE_ID = AIA.INVOICE_ID
     WHERE
-        XPUT.ORG_ID = :p_org_id
-        AND XPUT.ACTION = 'Reset' -- 只看已執行的重置
-        AND XPUT.ACTION_TIME IS NOT NULL -- 確保已執行
-        AND XPUT.CREATION_DATE BETWEEN :p_start_date AND :p_end_date;
+        XPUT.VALIDATE_ONLY = 'N'
+        AND XPUT.ACTION = 'Reset'
+        AND PHA.SEGMENT1 = :p_po_number -- 指定特定PO進行分析
+    ORDER BY
+        AIA.INVOICE_NUM;
     ```
