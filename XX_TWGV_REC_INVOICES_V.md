@@ -1,68 +1,77 @@
 ### TEMPLATE_ID: TWGV.XX_TWGV_REC_INVOICES_V
-- **用途**：提供台灣應收發票（GUI）的詳細資訊，包含電子發票的狀態與相關欄位。此視圖主要用於查詢、報表製作及稽核，以支援財務部門對銷項發票的管理與申報作業。
+- **用途**：提供台灣應收開立統一發票(GUI)的完整紀錄。此視圖用於查詢特定期間、客戶或發票號碼的銷售發票明細，並支援電子發票狀態、作廢、中獎等後續追蹤，是財會單位進行營業稅申報與帳務核對的關鍵資料來源。
 - **角色**：主表
 - **關鍵 Foreign Keys (輸出介面)**：
     - **核心業務關聯**：`TWGV_REC_INVOICES_ALL.SALES_NO` -> `RA_CUSTOMER_TRX_ALL.TRX_NUMBER`
     - **核心業務關聯**：`TWGV_REC_INVOICES_ALL.CUSTOMER_ID` -> `HZ_CUST_ACCOUNTS.CUST_ACCOUNT_ID`
+    - **核心業務關聯**：`TWGV_REC_INVOICES_ALL.BILL_TO_SITE_ID` -> `HZ_CUST_ACCT_SITES_ALL.CUST_ACCT_SITE_ID`
     - **維度關聯**：`TWGV_REC_INVOICES_ALL.ORG_ID` -> 營運單位 (Operating Unit)
 - **關鍵欄位說明 (Field Metadata)**：
-    - **`TWGV_REC_INVOICES_ALL.GUI_ID` ([GUI_ID])**：
-        - **用途**：台灣發票記錄的唯一內部識別碼。
+    - **`TWGV_REC_INVOICES_ALL.GUI_ID`**：
+        - **用途**：系統產生的發票紀錄唯一識別碼 (Primary Key)。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`TWGV_REC_INVOICES_ALL.GUI_NO` ([GUI_NO])**：
-        - **用途**：發票號碼，由字軌 (GUI_WORD) 與八碼數字組成。
+    - **`TWGV_REC_INVOICES_ALL.INVOICE_TYPE`**：
+        - **用途**：發票類型。例如：07 (B2C電子發票)、08 (B2B電子發票交換)。
+        - **代碼映射 (Mapping)**：`FND_LOOKUP_VALUES` (Lookup Type: `TWGV_INVOICE_TYPE`)
+        - **強制規則**：為財稅媒體申報檔的關鍵欄位。
+    - **`TWGV_REC_INVOICES_ALL.GUI_WORD`**：
+        - **用途**：發票字軌，為統一發票號碼的前兩個英文字母。
         - **代碼映射 (Mapping)**：不適用
-        - **強制規則**：遵循財政部發票號碼格式。
-    - **`TWGV_REC_INVOICES_ALL.SALES_NO` ([SALES_NO])**：
-        - **用途**：關聯的來源系統交易單號，通常是 Oracle EBS 的應收帳款發票號碼 (AR Invoice Number)。
+        - **強制規則**：不適用
+    - **`TWGV_REC_INVOICES_ALL.GUI_NO`**：
+        - **用途**：發票號碼，為統一發票的八位數字。
+        - **代碼映射 (Mapping)**：不適用
+        - **強制規則**：與 `GUI_WORD` 組合為唯一的發票號碼。
+    - **`TWGV_REC_INVOICES_ALL.GUI_DATE`**：
+        - **用途**：發票開立日期。
+        - **代碼映射 (Mapping)**：不適用
+        - **強制規則**：不適用
+    - **`TWGV_REC_INVOICES_ALL.SALES_AMT`**：
+        - **用途**：銷售額 (未稅金額)。
+        - **代碼映射 (Mapping)**：不適用
+        - **強制規則**：不適用
+    - **`TWGV_REC_INVOICES_ALL.VAT_IO`**：
+        - **用途**：營業稅額。
+        - **代碼映射 (Mapping)**：不適用
+        - **強制規則**：不適用
+    - **`TWGV_REC_INVOICES_ALL.SALES_NO`**：
+        - **用途**：來源交易單號，通常對應 Oracle EBS 應收模組 (AR) 的發票號碼 (`TRX_NUMBER`)。
         - **代碼映射 (Mapping)**：`RA_CUSTOMER_TRX_ALL.TRX_NUMBER`
-        - **強制規則**：不適用
-    - **`TWGV_REC_INVOICES_ALL.BUYER_NO` ([BUYER_NO])**：
-        - **用途**：買方統一編號，用於公司報帳。若為個人消費者則為空值。
-        - **代碼映射 (Mapping)**：不適用
-        - **強制規則**：須為 8 位數字。
-    - **`TWGV_REC_INVOICES_ALL.SALES_AMT` ([SALES_AMT])**：
-        - **用途**：發票的未稅銷售金額。
+        - **強制規則**：為追溯回來源系統交易的關鍵。
+    - **`TWGV_REC_INVOICES_ALL.EINV_STATUS`**：
+        - **用途**：電子發票狀態，例如 CONFIRMED (已確認)、VOIDED (已作廢)。
         - **代碼映射 (Mapping)**：不適用
         - **強制規則**：不適用
-    - **`TWGV_REC_INVOICES_ALL.VAT_IO` ([VAT_IO])**：
-        - **用途**：發票的營業稅額 (銷項稅額)。
-        - **代碼映射 (Mapping)**：不適用
-        - **強制規則**：不適用
-    - **`TWGV_REC_INVOICES_ALL.EINV_STATUS` ([EINV_STATUS])**：
-        - **用途**：電子發票的狀態，例如：已開立、已作廢、已上傳等。
-        - **代碼映射 (Mapping)**：`FND_LOOKUP_VALUES` (Lookup Type: `EIGV_ELEC_INVOICE_STATUS`)
-        - **強制規則**：不適用
-    - **`EIGV_PRIZE_INVOICE_LIST.FILE_CODE` ([PRIZE_FLAG])**：
-        - **用途**：中獎註記，從中獎清冊表 (`EIGV_PRIZE_INVOICE_LIST`) 取得。顯示發票是否中獎及其狀態。
-        - **代碼映射 (Mapping)**：自定義中獎狀態代碼。
+    - **`TWGV_REC_INVOICES_ALL.PRIZE_FLAG`**：
+        - **用途**：中獎註記，標示該張 B2C 發票是否中獎。
+        - **代碼映射 (Mapping)**：`EIGV_PRIZE_INVOICE_LIST`
         - **強制規則**：不適用
 
 - **範例 SQL**：
-
     層次一：直接使用 View 的查詢範例
     ```sql
     /*
-     * 範例一：快速查詢特定營運單位、特定客戶在指定期間內開立的所有發票。
-     * 適用情境：財務人員需要快速撈取某客戶的發票資料進行對帳或查詢。
+     * 情境：快速查詢特定營運單位在指定年月開給特定客戶的所有統一發票紀錄。
+     * 這是財會人員最常用的查詢方式，用於核對客戶帳款或準備稅務資料。
      */
     SELECT
         ORG_ID,
         GUI_DATE,
         GUI_WORD || GUI_NO AS INVOICE_NUMBER,
         CUSTOMER_NAME,
-        BUYER_NO,
         SALES_AMT,
         VAT_IO,
-        SALES_AMT + VAT_IO AS TOTAL_AMT,
-        EINV_STATUS
+        SALES_AMT + VAT_IO AS TOTAL_AMOUNT,
+        EINV_STATUS,
+        SALES_NO
     FROM
         XX_TWGV_REC_INVOICES_V
     WHERE
         ORG_ID = :p_org_id
-        AND GUI_DATE BETWEEN :p_start_date AND :p_end_date
-        AND CUSTOMER_NAME LIKE :p_customer_name || '%'
+        AND OCCURED_YEAR = :p_year  -- e.g., 2023
+        AND OCCURED_MONTH = :p_month -- e.g., 11
+        AND CUSTOMER_ID = :p_customer_id
     ORDER BY
         GUI_DATE DESC,
         GUI_NO DESC;
@@ -71,66 +80,79 @@
     層次二：拆解 View 背後 Table 的串接範例
     ```sql
     /*
-     * 範例二：拆解 View，直接串接發票主檔與中獎清冊表。
-     * 適用情境：除了發票基本資訊外，還需要取得中獎清冊中的其他欄位（如獎項、領獎日期等），
-     * 或是在大數據量下，透過明確的 JOIN 取代 View 中的子查詢以優化效能。
+     * 情境：除了發票基本資訊外，還需要查詢來源 AR 交易的類別 (Transaction Type) 與付款條件 (Payment Term)。
+     * 由於 View 未包含這些 AR 交易層的詳細資訊，因此需要直接串接發票主表與 AR 交易主表。
      */
     SELECT
+        TRI.ORG_ID,
         TRI.GUI_DATE,
         TRI.GUI_WORD || TRI.GUI_NO AS INVOICE_NUMBER,
-        TRI.CUSTOMER_NAME,
+        HCA.ACCOUNT_NUMBER,
+        HP.PARTY_NAME AS CUSTOMER_NAME,
         TRI.SALES_AMT,
         TRI.VAT_IO,
-        EPI.FILE_CODE AS PRIZE_FLAG,
-        EPI.PRIZE_TYPE,
-        EPI.PRIZE_AMT
+        RCT.TRX_NUMBER,
+        RTT.NAME AS TRANSACTION_TYPE,
+        RT.NAME AS PAYMENT_TERM
     FROM
         TWGV_REC_INVOICES_ALL TRI
-    LEFT OUTER JOIN EIGV_PRIZE_INVOICE_LIST EPI ON TRI.OTHER_DESC = EPI.OTHER_DESC
-                                               AND TRI.OCCURED_YEAR = EPI.PRIZE_YEAR
-                                               AND TRI.SALES_NO = EPI.SALES_NO
+        JOIN RA_CUSTOMER_TRX_ALL RCT ON TRI.SALES_NO = RCT.TRX_NUMBER AND TRI.ORG_ID = RCT.ORG_ID
+        JOIN HZ_CUST_ACCOUNTS HCA ON TRI.CUSTOMER_ID = HCA.CUST_ACCOUNT_ID
+        JOIN HZ_PARTIES HP ON HCA.PARTY_ID = HP.PARTY_ID
+        LEFT JOIN RA_CUST_TRX_TYPES_ALL RTT ON RCT.CUST_TRX_TYPE_ID = RTT.CUST_TRX_TYPE_ID AND RCT.ORG_ID = RTT.ORG_ID
+        LEFT JOIN RA_TERMS_TL RT ON RCT.TERM_ID = RT.TERM_ID AND RT.LANGUAGE = USERENV('LANG')
     WHERE
         TRI.ORG_ID = :p_org_id
-        AND TRI.OCCURED_YEAR = :p_gui_year
-        AND TRI.OCCURED_MONTH = :p_gui_month
-        -- 只查詢有中獎的發票
-        AND EPI.FILE_CODE IS NOT NULL
+        AND TRI.OCCURED_YEAR = :p_year
+        AND TRI.OCCURED_MONTH = :p_month
     ORDER BY
-        TRI.GUI_DATE;
+        TRI.GUI_DATE DESC;
     ```
 
     層次三：跨業務情境的延伸串接範例
     ```sql
     /*
-     * 範例三：從發票追溯回來源應收帳款(AR)與銷售訂單(OM)。
-     * 適用情境：稽核或業務分析時，需要從一張發票開始，向上追溯其對應的 AR 交易以及最源頭的銷售訂單，
-     * 以了解完整的 "Order-to-Cash" 流程，並核對訂單、AR發票與台灣GUI發票的金額與品項是否一致。
+     * 情境：稽核需求，需要從一張 GUI 發票追溯其完整的 Order-to-Cash 流程，
+     * 包含來源的銷售訂單號碼、訂單類型以及對應的出貨單號。
+     * 此查詢整合了台灣發票(TWGV)、應收(AR)、訂單管理(OM)與出貨(WSH)等多個模組的資料。
      */
     SELECT
-        OOHA.ORDER_NUMBER,
-        OOHA.ORDERED_DATE,
-        RCTA.TRX_NUMBER        AS AR_INVOICE_NUMBER,
-        RCTA.TRX_DATE          AS AR_INVOICE_DATE,
-        TRI.GUI_WORD || TRI.GUI_NO AS TW_GUI_NUMBER,
-        TRI.GUI_DATE           AS TW_GUI_DATE,
-        HCA.ACCOUNT_NUMBER     AS CUSTOMER_NUMBER,
-        HP.PARTY_NAME          AS CUSTOMER_NAME,
-        TRI.SALES_AMT          AS GUI_SALES_AMT,
-        TRI.VAT_IO             AS GUI_VAT_AMT
+        TRI.GUI_WORD || TRI.GUI_NO AS INVOICE_NUMBER,
+        TRI.GUI_DATE,
+        HP.PARTY_NAME AS CUSTOMER_NAME,
+        RCT.TRX_NUMBER AS AR_INVOICE_NUMBER,
+        OOHA.ORDER_NUMBER AS SALES_ORDER_NUMBER,
+        OOTT.NAME AS ORDER_TYPE,
+        WND.DELIVERY_ID AS SHIPMENT_NUMBER,
+        WND.INITIAL_PICKUP_DATE AS SHIP_DATE
     FROM
-        TWGV_REC_INVOICES_ALL    TRI
-        JOIN RA_CUSTOMER_TRX_ALL      RCTA ON TRI.SALES_NO = RCTA.TRX_NUMBER
-                                       AND TRI.ORG_ID = RCTA.ORG_ID
-        JOIN HZ_CUST_ACCOUNTS       HCA ON RCTA.BILL_TO_CUSTOMER_ID = HCA.CUST_ACCOUNT_ID
-        JOIN HZ_PARTIES             HP ON HCA.PARTY_ID = HP.PARTY_ID
-        -- 透過 AR Transaction Line 關聯回 Sales Order Line
-        JOIN RA_CUSTOMER_TRX_LINES_ALL RCTLA ON RCTA.CUSTOMER_TRX_ID = RCTLA.CUSTOMER_TRX_ID
-                                            AND RCTLA.INTERFACE_LINE_CONTEXT = 'ORDER ENTRY'
-        JOIN OE_ORDER_LINES_ALL       OOLA ON RCTLA.INTERFACE_LINE_ATTRIBUTE6 = TO_CHAR(OOLA.LINE_ID)
-        JOIN OE_ORDER_HEADERS_ALL     OOHA ON OOLA.HEADER_ID = OOHA.HEADER_ID
+        TWGV_REC_INVOICES_ALL TRI
+        -- Step 1: Link GUI Invoice to AR Invoice
+        JOIN RA_CUSTOMER_TRX_ALL RCT ON TRI.SALES_NO = RCT.TRX_NUMBER AND TRI.ORG_ID = RCT.ORG_ID
+        -- Step 2: Link AR Invoice to Sales Order Header (Standard OM-AR Interface)
+        JOIN OE_ORDER_HEADERS_ALL OOHA ON RCT.INTERFACE_HEADER_ATTRIBUTE1 = TO_CHAR(OOHA.ORDER_NUMBER) AND RCT.ORG_ID = OOHA.ORG_ID
+        -- Step 3: Get Order Type information
+        JOIN OE_TRANSACTION_TYPES_TL OOTT ON OOHA.ORDER_TYPE_ID = OOTT.TRANSACTION_TYPE_ID AND OOTT.LANGUAGE = USERENV('LANG')
+        -- Step 4: Link Sales Order Lines to Shipping Delivery Details
+        JOIN OE_ORDER_LINES_ALL OOLA ON OOHA.HEADER_ID = OOLA.HEADER_ID
+        JOIN WSH_DELIVERY_DETAILS WDD ON OOLA.LINE_ID = WDD.SOURCE_LINE_ID AND WDD.SOURCE_CODE = 'OE'
+        -- Step 5: Link Delivery Details to Delivery (Shipment)
+        JOIN WSH_NEW_DELIVERIES WND ON WDD.DELIVERY_ID = WND.DELIVERY_ID
+        -- Customer Information
+        JOIN HZ_CUST_ACCOUNTS HCA ON TRI.CUSTOMER_ID = HCA.CUST_ACCOUNT_ID
+        JOIN HZ_PARTIES HP ON HCA.PARTY_ID = HP.PARTY_ID
     WHERE
-        TRI.GUI_NO = :p_gui_no
-        AND TRI.GUI_WORD = :p_gui_word
+        TRI.ORG_ID = :p_org_id
+        AND TRI.GUI_WORD || TRI.GUI_NO = :p_invoice_number -- e.g., 'AB12345678'
+    GROUP BY
+        TRI.GUI_WORD || TRI.GUI_NO,
+        TRI.GUI_DATE,
+        HP.PARTY_NAME,
+        RCT.TRX_NUMBER,
+        OOHA.ORDER_NUMBER,
+        OOTT.NAME,
+        WND.DELIVERY_ID,
+        WND.INITIAL_PICKUP_DATE
     ORDER BY
-        OOHA.ORDER_NUMBER;
+        WND.INITIAL_PICKUP_DATE;
     ```
